@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CSV Data Analysis</title>
+  <style>
+    #file-upload {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #results {
+      margin-top: 20px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div id="file-upload">
+    <input type="file" id="csv-file" accept=".csv">
+    <button id="upload-btn">Upload CSV</button>
+  </div>
+  <div id="results"></div>
+  <button id="download-pdf-btn" disabled>Download PDF</button>
+
+  <script>
+    const csvFile = document.getElementById('csv-file');
+    const uploadBtn = document.getElementById('upload-btn');
+    const resultsDiv = document.getElementById('results');
+    const downloadPdfBtn = document.getElementById('download-pdf-btn');
+    let reportContent = '';
+
+    uploadBtn.addEventListener('click', () => {
+      const file = csvFile.files[0];
+      if (!file) {
+        alert('Please select a CSV file first.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const csvData = event.target.result.trim();
+        const lines = csvData.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        const data = [];
+
+        // Parse CSV rows
+        for (let i = 3; i < lines.length; i++) {
+          const row = lines[i].split(',').map(v => parseFloat(v.trim()));
+          if (row.length === headers.length) {
+            data.push(row);
+          }
+        }
+
+        const averages = {};
+        headers.forEach((header, index) => {
+          let sum = 0;
+          let count = 0;
+
+          data.forEach(row => {
+            const value = row[index];
+            if (!isNaN(value)) {
+              sum += value;
+              count++;
+            }
+          });
+
+          const average = count > 0 ? sum / count : 0;
+          averages[header] = average;
+        });
+
+        // Display averages on the web page
+        resultsDiv.innerHTML = '<h2>Average Values:</h2><ul>';
+        reportContent = 'Average Values Report:\n\n'; // Prepare content for PDF
+        for (const header in averages) {
+          const averageText = `${header}: ${averages[header].toFixed(2)}`;
+          resultsDiv.innerHTML += `<li>${averageText}</li>`;
+          reportContent += `The average value in ${header} is ${averages[header].toFixed(2)}\n`;
+        }
+        resultsDiv.innerHTML += '</ul>';
+        downloadPdfBtn.disabled = false; // Enable PDF download button
+      };
+      reader.readAsText(file);
+    });
+
+    downloadPdfBtn.addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+      pdf.setFontSize(12);
+      pdf.text(reportContent, 10, 10); // Add report content to PDF
+      pdf.save('average_values_report.pdf'); // Save the PDF
+    });
+  </script>
+</body>
+</html>
