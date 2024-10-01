@@ -93,6 +93,7 @@
         let temperatureData = [];
         let humidityData = [];
         let rainfallData = [];
+        let days = Array.from({ length: 31 }, (_, i) => i + 1);  // Assume 31 days for the month
 
         // Process the remaining lines (starting from row 6 onwards)
         for (let i = 5; i < lines.length; i++) {
@@ -103,19 +104,30 @@
             if (!isNaN(value)) {
               const elementId = parseInt(elementIds[j]);
               if (elementId === 2) {
-                temperatureData.push(value);
+                temperatureData.push({ value, day: i - 4 });
               } else if (elementId === 3) {
-                humidityData.push(value);
+                humidityData.push({ value, day: i - 4 });
               } else if (elementId === 4) {
-                rainfallData.push(value);
+                rainfallData.push({ value, day: i - 4 });
               }
             }
           }
         }
 
+        // Helper functions to calculate max, min and their dates
+        const getMaxValueAndDay = (data) => data.reduce((max, entry) => entry.value > max.value ? entry : max, data[0]);
+        const getMinValueAndDay = (data) => data.reduce((min, entry) => entry.value < min.value ? entry : min, data[0]);
+
+        const maxTemp = getMaxValueAndDay(temperatureData);
+        const minTemp = getMinValueAndDay(temperatureData);
+        const maxHumidity = getMaxValueAndDay(humidityData);
+        const minHumidity = getMinValueAndDay(humidityData);
+        const maxRainfall = getMaxValueAndDay(rainfallData);
+        const minRainfall = getMinValueAndDay(rainfallData);
+
         // Calculate averages and sums
-        const calculateAverage = (data) => data.reduce((sum, val) => sum + val, 0) / data.length || 0;
-        const calculateSum = (data) => data.reduce((sum, val) => sum + val, 0) || 0;
+        const calculateAverage = (data) => data.reduce((sum, entry) => sum + entry.value, 0) / data.length || 0;
+        const calculateSum = (data) => data.reduce((sum, entry) => sum + entry.value, 0) || 0;
 
         const avgTemp = calculateAverage(temperatureData);
         const avgHumidity = calculateAverage(humidityData);
@@ -126,16 +138,22 @@
         reportText += `<p><strong>Station ID:</strong> ${stationId}</p>`;
         reportText += `<p><strong>Year:</strong> ${year}</p>`;
         reportText += `<p><strong>Month:</strong> ${month}</p>`;
-        
+
         let summary = '';
         if (temperatureData.length > 0) {
           summary += `<p><strong>Average Temperature:</strong> ${avgTemp.toFixed(2)}°C</p>`;
+          summary += `<p><strong>Max Temperature:</strong> ${maxTemp.value.toFixed(2)}°C on day ${maxTemp.day}</p>`;
+          summary += `<p><strong>Min Temperature:</strong> ${minTemp.value.toFixed(2)}°C on day ${minTemp.day}</p>`;
         }
         if (humidityData.length > 0) {
           summary += `<p><strong>Average Humidity:</strong> ${avgHumidity.toFixed(2)}%</p>`;
+          summary += `<p><strong>Max Humidity:</strong> ${maxHumidity.value.toFixed(2)}% on day ${maxHumidity.day}</p>`;
+          summary += `<p><strong>Min Humidity:</strong> ${minHumidity.value.toFixed(2)}% on day ${minHumidity.day}</p>`;
         }
         if (rainfallData.length > 0) {
           summary += `<p><strong>Total Rainfall:</strong> ${totalRainfall.toFixed(2)} mm</p>`;
+          summary += `<p><strong>Max Rainfall:</strong> ${maxRainfall.value.toFixed(2)} mm on day ${maxRainfall.day}</p>`;
+          summary += `<p><strong>Min Rainfall:</strong> ${minRainfall.value.toFixed(2)} mm on day ${minRainfall.day}</p>`;
         }
 
         reportText += summary;
@@ -147,22 +165,28 @@
           year,
           month,
           avgTemp: temperatureData.length > 0 ? avgTemp.toFixed(2) : null,
+          maxTemp: temperatureData.length > 0 ? maxTemp : null,
+          minTemp: temperatureData.length > 0 ? minTemp : null,
           avgHumidity: humidityData.length > 0 ? avgHumidity.toFixed(2) : null,
+          maxHumidity: humidityData.length > 0 ? maxHumidity : null,
+          minHumidity: humidityData.length > 0 ? minHumidity : null,
           totalRainfall: rainfallData.length > 0 ? totalRainfall.toFixed(2) : null,
+          maxRainfall: rainfallData.length > 0 ? maxRainfall : null,
+          minRainfall: rainfallData.length > 0 ? minRainfall : null,
         };
 
         // Plot the charts
-        const days = Array.from({ length: temperatureData.length }, (_, i) => i + 1); // Days of the month
+        const daysArray = Array.from({ length: temperatureData.length }, (_, i) => i + 1);
 
         // Plot temperature chart
         if (temperatureChart) temperatureChart.destroy();
         temperatureChart = new Chart(document.getElementById('temperatureChart'), {
           type: 'line',
           data: {
-            labels: days,
+            labels: daysArray,
             datasets: [{
               label: 'Temperature (°C)',
-              data: temperatureData,
+              data: temperatureData.map(entry => entry.value),
               borderColor: 'rgba(255, 99, 132, 1)',
               fill: false,
             }]
@@ -181,10 +205,10 @@
         humidityChart = new Chart(document.getElementById('humidityChart'), {
           type: 'line',
           data: {
-            labels: days,
+            labels: daysArray,
             datasets: [{
               label: 'Humidity (%)',
-              data: humidityData,
+              data: humidityData.map(entry => entry.value),
               borderColor: 'rgba(54, 162, 235, 1)',
               fill: false,
             }]
@@ -203,10 +227,10 @@
         rainfallChart = new Chart(document.getElementById('rainfallChart'), {
           type: 'line',
           data: {
-            labels: days,
+            labels: daysArray,
             datasets: [{
               label: 'Rainfall (mm)',
-              data: rainfallData,
+              data: rainfallData.map(entry => entry.value),
               borderColor: 'rgba(75, 192, 192, 1)',
               fill: false,
             }]
@@ -226,34 +250,86 @@
       reader.readAsText(csvFile.files[0]);
     });
 
-    downloadPdfBtn.addEventListener('click', async () => {
+    downloadPdfBtn.addEventListener('click', () => {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF();
+      let y = 10;
 
       pdf.setFontSize(16);
-      pdf.text('Station Data Report', 10, 10);
+      pdf.text('Station Data Report', 10, y);
+      y += 10;
+
       pdf.setFontSize(12);
-      pdf.text(`Station ID: ${reportData.stationId}`, 10, 20);
-      pdf.text(`Year: ${reportData.year}`, 10, 30);
-      pdf.text(`Month: ${reportData.month}`, 10, 40);
+      pdf.text(`Station ID: ${reportData.stationId}`, 10, y);
+      y += 10;
+      pdf.text(`Year: ${reportData.year}`, 10, y);
+      y += 10;
+      pdf.text(`Month: ${reportData.month}`, 10, y);
+      y += 10;
+
       if (reportData.avgTemp) {
-        pdf.text(`Average Temperature: ${reportData.avgTemp}°C`, 10, 50);
+        pdf.text(`Average Temperature: ${reportData.avgTemp}°C`, 10, y);
+        y += 10;
+        pdf.text(`Max Temperature: ${reportData.maxTemp.value}°C on day ${reportData.maxTemp.day}`, 10, y);
+        y += 10;
+        pdf.text(`Min Temperature: ${reportData.minTemp.value}°C on day ${reportData.minTemp.day}`, 10, y);
+        y += 10;
       }
+
+      if (y > 270) {
+        pdf.addPage();
+        y = 10;
+      }
+
       if (reportData.avgHumidity) {
-        pdf.text(`Average Humidity: ${reportData.avgHumidity}%`, 10, 60);
+        pdf.text(`Average Humidity: ${reportData.avgHumidity}%`, 10, y);
+        y += 10;
+        pdf.text(`Max Humidity: ${reportData.maxHumidity.value}% on day ${reportData.maxHumidity.day}`, 10, y);
+        y += 10;
+        pdf.text(`Min Humidity: ${reportData.minHumidity.value}% on day ${reportData.minHumidity.day}`, 10, y);
+        y += 10;
       }
+
+      if (y > 270) {
+        pdf.addPage();
+        y = 10;
+      }
+
       if (reportData.totalRainfall) {
-        pdf.text(`Total Rainfall: ${reportData.totalRainfall} mm`, 10, 70);
+        pdf.text(`Total Rainfall: ${reportData.totalRainfall} mm`, 10, y);
+        y += 10;
+        pdf.text(`Max Rainfall: ${reportData.maxRainfall.value} mm on day ${reportData.maxRainfall.day}`, 10, y);
+        y += 10;
+        pdf.text(`Min Rainfall: ${reportData.minRainfall.value} mm on day ${reportData.minRainfall.day}`, 10, y);
+        y += 10;
       }
 
-      // Convert charts to base64 images and add to the PDF
+      // Add Temperature Chart
       const temperatureChartImg = document.getElementById('temperatureChart').toDataURL('image/png');
-      const humidityChartImg = document.getElementById('humidityChart').toDataURL('image/png');
-      const rainfallChartImg = document.getElementById('rainfallChart').toDataURL('image/png');
+      if (y + 70 > 290) {
+        pdf.addPage();
+        y = 10;
+      }
+      pdf.addImage(temperatureChartImg, 'PNG', 10, y, 180, 60);
+      y += 70;
 
-      pdf.addImage(temperatureChartImg, 'PNG', 10, 80, 180, 60);
-      pdf.addImage(humidityChartImg, 'PNG', 10, 150, 180, 60);
-      pdf.addImage(rainfallChartImg, 'PNG', 10, 220, 180, 60);
+      // Add Humidity Chart
+      const humidityChartImg = document.getElementById('humidityChart').toDataURL('image/png');
+      if (y + 70 > 290) {
+        pdf.addPage();
+        y = 10;
+      }
+      pdf.addImage(humidityChartImg, 'PNG', 10, y, 180, 60);
+      y += 70;
+
+      // Add Rainfall Chart
+      const rainfallChartImg = document.getElementById('rainfallChart').toDataURL('image/png');
+      if (y + 70 > 290) {
+        pdf.addPage();
+        y = 10;
+      }
+      pdf.addImage(rainfallChartImg, 'PNG', 10, y, 180, 60);
+      y += 70;
 
       // Save the PDF
       pdf.save('station_data_report_with_charts.pdf');
