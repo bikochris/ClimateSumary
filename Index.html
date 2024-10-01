@@ -141,16 +141,19 @@
 
         let summary = '';
         if (temperatureData.length > 0) {
+          summary += `<h3>Temperature</h3>`;
           summary += `<p><strong>Average Temperature:</strong> ${avgTemp.toFixed(2)}°C</p>`;
           summary += `<p><strong>Max Temperature:</strong> ${maxTemp.value.toFixed(2)}°C on day ${maxTemp.day}</p>`;
           summary += `<p><strong>Min Temperature:</strong> ${minTemp.value.toFixed(2)}°C on day ${minTemp.day}</p>`;
         }
         if (humidityData.length > 0) {
+          summary += `<h3>Humidity</h3>`;
           summary += `<p><strong>Average Humidity:</strong> ${avgHumidity.toFixed(2)}%</p>`;
           summary += `<p><strong>Max Humidity:</strong> ${maxHumidity.value.toFixed(2)}% on day ${maxHumidity.day}</p>`;
           summary += `<p><strong>Min Humidity:</strong> ${minHumidity.value.toFixed(2)}% on day ${minHumidity.day}</p>`;
         }
         if (rainfallData.length > 0) {
+          summary += `<h3>Rainfall</h3>`;
           summary += `<p><strong>Total Rainfall:</strong> ${totalRainfall.toFixed(2)} mm</p>`;
           summary += `<p><strong>Max Rainfall:</strong> ${maxRainfall.value.toFixed(2)} mm on day ${maxRainfall.day}</p>`;
           summary += `<p><strong>Min Rainfall:</strong> ${minRainfall.value.toFixed(2)} mm on day ${minRainfall.day}</p>`;
@@ -244,7 +247,8 @@
           }
         });
 
-        downloadPdfBtn.disabled = false;  // Enable download button
+        // Enable the PDF download button
+        downloadPdfBtn.disabled = false;
       };
 
       reader.readAsText(csvFile.files[0]);
@@ -252,87 +256,60 @@
 
     downloadPdfBtn.addEventListener('click', () => {
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF();
-      let y = 10;
+      const doc = new jsPDF();
 
-      pdf.setFontSize(16);
-      pdf.text('Station Data Report', 10, y);
-      y += 10;
+      // Add station info on the first page
+      doc.setFontSize(20);
+      doc.text('Station Data Report', 10, 10);
+      doc.setFontSize(14);
+      doc.text(`Station ID: ${reportData.stationId}`, 10, 30);
+      doc.text(`Year: ${reportData.year}`, 10, 40);
+      doc.text(`Month: ${reportData.month}`, 10, 50);
+      doc.addPage();
 
-      pdf.setFontSize(12);
-      pdf.text(`Station ID: ${reportData.stationId}`, 10, y);
-      y += 10;
-      pdf.text(`Year: ${reportData.year}`, 10, y);
-      y += 10;
-      pdf.text(`Month: ${reportData.month}`, 10, y);
-      y += 10;
+      // Add Temperature details and chart on the same page
+      if (reportData.avgTemp !== null) {
+        doc.setFontSize(16);
+        doc.text('Temperature', 10, 10);
+        doc.setFontSize(12);
+        doc.text(`Average: ${reportData.avgTemp} °C`, 10, 20);
+        doc.text(`Max: ${reportData.maxTemp.value} °C on day ${reportData.maxTemp.day}`, 10, 30);
+        doc.text(`Min: ${reportData.minTemp.value} °C on day ${reportData.minTemp.day}`, 10, 40);
 
-      if (reportData.avgTemp) {
-        pdf.text(`Average Temperature: ${reportData.avgTemp}°C`, 10, y);
-        y += 10;
-        pdf.text(`Max Temperature: ${reportData.maxTemp.value}°C on day ${reportData.maxTemp.day}`, 10, y);
-        y += 10;
-        pdf.text(`Min Temperature: ${reportData.minTemp.value}°C on day ${reportData.minTemp.day}`, 10, y);
-        y += 10;
+        // Add Temperature Chart
+        doc.addImage(temperatureChart.toBase64Image(), 'PNG', 10, 50, 180, 90);
+        doc.addPage(); // Add a new page for the next parameter
       }
 
-      if (y > 270) {
-        pdf.addPage();
-        y = 10;
+      // Add Humidity details and chart on the same page
+      if (reportData.avgHumidity !== null) {
+        doc.setFontSize(16);
+        doc.text('Humidity', 10, 10);
+        doc.setFontSize(12);
+        doc.text(`Average: ${reportData.avgHumidity} %`, 10, 20);
+        doc.text(`Max: ${reportData.maxHumidity.value} % on day ${reportData.maxHumidity.day}`, 10, 30);
+        doc.text(`Min: ${reportData.minHumidity.value} % on day ${reportData.minHumidity.day}`, 10, 40);
+
+        // Add Humidity Chart
+        doc.addImage(humidityChart.toBase64Image(), 'PNG', 10, 50, 180, 90);
+        doc.addPage(); // Add a new page for the next parameter
       }
 
-      if (reportData.avgHumidity) {
-        pdf.text(`Average Humidity: ${reportData.avgHumidity}%`, 10, y);
-        y += 10;
-        pdf.text(`Max Humidity: ${reportData.maxHumidity.value}% on day ${reportData.maxHumidity.day}`, 10, y);
-        y += 10;
-        pdf.text(`Min Humidity: ${reportData.minHumidity.value}% on day ${reportData.minHumidity.day}`, 10, y);
-        y += 10;
-      }
+      // Add Rainfall details and chart on the same page
+      if (reportData.totalRainfall !== null) {
+        doc.setFontSize(16);
+        doc.text('Rainfall', 10, 10);
+        doc.setFontSize(12);
+        doc.text(`Total: ${reportData.totalRainfall} mm`, 10, 20);
+        doc.text(`Max: ${reportData.maxRainfall.value} mm on day ${reportData.maxRainfall.day}`, 10, 30);
+        doc.text(`Min: ${reportData.minRainfall.value} mm on day ${reportData.minRainfall.day}`, 10, 40);
 
-      if (y > 270) {
-        pdf.addPage();
-        y = 10;
+        // Add Rainfall Chart
+        doc.addImage(rainfallChart.toBase64Image(), 'PNG', 10, 50, 180, 90);
       }
-
-      if (reportData.totalRainfall) {
-        pdf.text(`Total Rainfall: ${reportData.totalRainfall} mm`, 10, y);
-        y += 10;
-        pdf.text(`Max Rainfall: ${reportData.maxRainfall.value} mm on day ${reportData.maxRainfall.day}`, 10, y);
-        y += 10;
-        pdf.text(`Min Rainfall: ${reportData.minRainfall.value} mm on day ${reportData.minRainfall.day}`, 10, y);
-        y += 10;
-      }
-
-      // Add Temperature Chart
-      const temperatureChartImg = document.getElementById('temperatureChart').toDataURL('image/png');
-      if (y + 70 > 290) {
-        pdf.addPage();
-        y = 10;
-      }
-      pdf.addImage(temperatureChartImg, 'PNG', 10, y, 180, 60);
-      y += 70;
-
-      // Add Humidity Chart
-      const humidityChartImg = document.getElementById('humidityChart').toDataURL('image/png');
-      if (y + 70 > 290) {
-        pdf.addPage();
-        y = 10;
-      }
-      pdf.addImage(humidityChartImg, 'PNG', 10, y, 180, 60);
-      y += 70;
-
-      // Add Rainfall Chart
-      const rainfallChartImg = document.getElementById('rainfallChart').toDataURL('image/png');
-      if (y + 70 > 290) {
-        pdf.addPage();
-        y = 10;
-      }
-      pdf.addImage(rainfallChartImg, 'PNG', 10, y, 180, 60);
-      y += 70;
 
       // Save the PDF
-      pdf.save('station_data_report_with_charts.pdf');
+      doc.save('station_data_report.pdf');
     });
   </script>
 </body>
