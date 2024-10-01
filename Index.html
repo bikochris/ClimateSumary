@@ -33,8 +33,13 @@
     #download-pdf-btn {
       margin-top: 20px;
     }
+    .chart-container {
+      width: 100%;
+      margin: 20px 0;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h1>Station Data Report Generator</h1>
@@ -45,6 +50,17 @@
   <div id="results"></div>
   <button id="download-pdf-btn" disabled>Download PDF Report</button>
 
+  <!-- Containers for the charts -->
+  <div class="chart-container">
+    <canvas id="temperatureChart"></canvas>
+  </div>
+  <div class="chart-container">
+    <canvas id="humidityChart"></canvas>
+  </div>
+  <div class="chart-container">
+    <canvas id="rainfallChart"></canvas>
+  </div>
+
   <script>
     const csvFile = document.getElementById('csv-file');
     const uploadBtn = document.getElementById('upload-btn');
@@ -52,6 +68,9 @@
     const downloadPdfBtn = document.getElementById('download-pdf-btn');
 
     let reportData = '';  // Stores the report content for the PDF
+
+    // Initialize Chart variables
+    let temperatureChart, humidityChart, rainfallChart;
 
     uploadBtn.addEventListener('click', () => {
       if (!csvFile.files.length) {
@@ -132,13 +151,82 @@
           totalRainfall: rainfallData.length > 0 ? totalRainfall.toFixed(2) : null,
         };
 
+        // Plot the charts
+        const days = Array.from({ length: temperatureData.length }, (_, i) => i + 1); // Days of the month
+
+        // Plot temperature chart
+        if (temperatureChart) temperatureChart.destroy();
+        temperatureChart = new Chart(document.getElementById('temperatureChart'), {
+          type: 'line',
+          data: {
+            labels: days,
+            datasets: [{
+              label: 'Temperature (°C)',
+              data: temperatureData,
+              borderColor: 'rgba(255, 99, 132, 1)',
+              fill: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            title: {
+              display: true,
+              text: 'Temperature vs Day'
+            }
+          }
+        });
+
+        // Plot humidity chart
+        if (humidityChart) humidityChart.destroy();
+        humidityChart = new Chart(document.getElementById('humidityChart'), {
+          type: 'line',
+          data: {
+            labels: days,
+            datasets: [{
+              label: 'Humidity (%)',
+              data: humidityData,
+              borderColor: 'rgba(54, 162, 235, 1)',
+              fill: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            title: {
+              display: true,
+              text: 'Humidity vs Day'
+            }
+          }
+        });
+
+        // Plot rainfall chart
+        if (rainfallChart) rainfallChart.destroy();
+        rainfallChart = new Chart(document.getElementById('rainfallChart'), {
+          type: 'line',
+          data: {
+            labels: days,
+            datasets: [{
+              label: 'Rainfall (mm)',
+              data: rainfallData,
+              borderColor: 'rgba(75, 192, 192, 1)',
+              fill: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            title: {
+              display: true,
+              text: 'Rainfall vs Day'
+            }
+          }
+        });
+
         downloadPdfBtn.disabled = false;  // Enable download button
       };
 
       reader.readAsText(csvFile.files[0]);
     });
 
-    downloadPdfBtn.addEventListener('click', () => {
+    downloadPdfBtn.addEventListener('click', async () => {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF();
 
@@ -158,8 +246,17 @@
         pdf.text(`Total Rainfall: ${reportData.totalRainfall} mm`, 10, 70);
       }
 
+      // Convert charts to base64 images and add to the PDF
+      const temperatureChartImg = document.getElementById('temperatureChart').toDataURL('image/png');
+      const humidityChartImg = document.getElementById('humidityChart').toDataURL('image/png');
+      const rainfallChartImg = document.getElementById('rainfallChart').toDataURL('image/png');
+
+      pdf.addImage(temperatureChartImg, 'PNG', 10, 80, 180, 60);
+      pdf.addImage(humidityChartImg, 'PNG', 10, 150, 180, 60);
+      pdf.addImage(rainfallChartImg, 'PNG', 10, 220, 180, 60);
+
       // Save the PDF
-      pdf.save('station_data_report.pdf');
+      pdf.save('station_data_report_with_charts.pdf');
     });
   </script>
 </body>
