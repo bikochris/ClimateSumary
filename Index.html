@@ -2,92 +2,164 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CSV Data Analysis</title>
+  <title>Station Data Report</title>
   <style>
-    #file-upload {
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
       text-align: center;
+      color: #333;
+    }
+    #file-upload {
       margin-bottom: 20px;
+      text-align: center;
     }
     #results {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #download-pdf-btn {
       margin-top: 20px;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
+  <h1>Station Data Report Generator</h1>
   <div id="file-upload">
     <input type="file" id="csv-file" accept=".csv">
     <button id="upload-btn">Upload CSV</button>
   </div>
   <div id="results"></div>
-  <button id="download-pdf-btn" disabled>Download PDF</button>
+  <button id="download-pdf-btn" disabled>Download PDF Report</button>
 
   <script>
     const csvFile = document.getElementById('csv-file');
     const uploadBtn = document.getElementById('upload-btn');
     const resultsDiv = document.getElementById('results');
     const downloadPdfBtn = document.getElementById('download-pdf-btn');
-    let reportContent = '';
+
+    let reportData = '';  // Stores the report content for the PDF
 
     uploadBtn.addEventListener('click', () => {
-      const file = csvFile.files[0];
-      if (!file) {
-        alert('Please select a CSV file first.');
+      if (!csvFile.files.length) {
+        alert('Please upload a CSV file.');
         return;
       }
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        const csvData = event.target.result.trim();
-        const lines = csvData.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
-        const data = [];
+        const csvData = event.target.result;
+        const lines = csvData.split('\n').map(line => line.trim());
 
-        // Parse CSV rows
-        for (let i = 3; i < lines.length; i++) {
-          const row = lines[i].split(',').map(v => parseFloat(v.trim()));
-          if (row.length === headers.length) {
-            data.push(row);
+        // Extract metadata from the CSV file
+        const stationId = lines[0].split(',')[0];
+        const elementIds = lines[1].split(','); // There might be more than one element
+        const year = lines[2].split(',')[0];
+        const month = lines[3].split(',')[0];
+
+        // Initialize variables to store element data
+        let temperatureData = [];
+        let humidityData = [];
+        let rainfallData = [];
+
+        // Process the remaining lines (starting from row 6 onwards)
+        for (let i = 5; i < lines.length; i++) {
+          const row = lines[i].split(',');
+          for (let j = 0; j < elementIds.length; j++) {
+            const value = parseFloat(row[j]);
+
+            if (!isNaN(value)) {
+              const elementId = parseInt(elementIds[j]);
+              if (elementId === 2) {
+                temperatureData.push(value);
+              } else if (elementId === 3) {
+                humidityData.push(value);
+              } else if (elementId === 4) {
+                rainfallData.push(value);
+              }
+            }
           }
         }
 
-        const averages = {};
-        headers.forEach((header, index) => {
-          let sum = 0;
-          let count = 0;
+        // Calculate averages and sums
+        const calculateAverage = (data) => data.reduce((sum, val) => sum + val, 0) / data.length || 0;
+        const calculateSum = (data) => data.reduce((sum, val) => sum + val, 0) || 0;
 
-          data.forEach(row => {
-            const value = row[index];
-            if (!isNaN(value)) {
-              sum += value;
-              count++;
-            }
-          });
+        const avgTemp = calculateAverage(temperatureData);
+        const avgHumidity = calculateAverage(humidityData);
+        const totalRainfall = calculateSum(rainfallData);
 
-          const average = count > 0 ? sum / count : 0;
-          averages[header] = average;
-        });
-
-        // Display averages on the web page
-        resultsDiv.innerHTML = '<h2>Average Values:</h2><ul>';
-        reportContent = 'Average Values Report:\n\n'; // Prepare content for PDF
-        for (const header in averages) {
-          const averageText = `${header}: ${averages[header].toFixed(2)}`;
-          resultsDiv.innerHTML += `<li>${averageText}</li>`;
-          reportContent += `The average value in ${header} is ${averages[header].toFixed(2)}\n`;
+        // Display results in HTML
+        let reportText = `<h2>Station Data Report</h2>`;
+        reportText += `<p><strong>Station ID:</strong> ${stationId}</p>`;
+        reportText += `<p><strong>Year:</strong> ${year}</p>`;
+        reportText += `<p><strong>Month:</strong> ${month}</p>`;
+        
+        let summary = '';
+        if (temperatureData.length > 0) {
+          summary += `<p><strong>Average Temperature:</strong> ${avgTemp.toFixed(2)}°C</p>`;
         }
-        resultsDiv.innerHTML += '</ul>';
-        downloadPdfBtn.disabled = false; // Enable PDF download button
+        if (humidityData.length > 0) {
+          summary += `<p><strong>Average Humidity:</strong> ${avgHumidity.toFixed(2)}%</p>`;
+        }
+        if (rainfallData.length > 0) {
+          summary += `<p><strong>Total Rainfall:</strong> ${totalRainfall.toFixed(2)} mm</p>`;
+        }
+
+        reportText += summary;
+        resultsDiv.innerHTML = reportText;
+
+        // Prepare data for PDF
+        reportData = {
+          stationId,
+          year,
+          month,
+          avgTemp: temperatureData.length > 0 ? avgTemp.toFixed(2) : null,
+          avgHumidity: humidityData.length > 0 ? avgHumidity.toFixed(2) : null,
+          totalRainfall: rainfallData.length > 0 ? totalRainfall.toFixed(2) : null,
+        };
+
+        downloadPdfBtn.disabled = false;  // Enable download button
       };
-      reader.readAsText(file);
+
+      reader.readAsText(csvFile.files[0]);
     });
 
     downloadPdfBtn.addEventListener('click', () => {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF();
+
+      pdf.setFontSize(16);
+      pdf.text('Station Data Report', 10, 10);
       pdf.setFontSize(12);
-      pdf.text(reportContent, 10, 10); // Add report content to PDF
-      pdf.save('average_values_report.pdf'); // Save the PDF
+      pdf.text(`Station ID: ${reportData.stationId}`, 10, 20);
+      pdf.text(`Year: ${reportData.year}`, 10, 30);
+      pdf.text(`Month: ${reportData.month}`, 10, 40);
+      if (reportData.avgTemp) {
+        pdf.text(`Average Temperature: ${reportData.avgTemp}°C`, 10, 50);
+      }
+      if (reportData.avgHumidity) {
+        pdf.text(`Average Humidity: ${reportData.avgHumidity}%`, 10, 60);
+      }
+      if (reportData.totalRainfall) {
+        pdf.text(`Total Rainfall: ${reportData.totalRainfall} mm`, 10, 70);
+      }
+
+      // Save the PDF
+      pdf.save('station_data_report.pdf');
     });
   </script>
 </body>
